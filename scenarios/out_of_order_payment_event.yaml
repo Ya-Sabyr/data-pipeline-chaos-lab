@@ -1,0 +1,67 @@
+name: out_of_order_payment_event
+description: A payment event arrives before its invoice exists. The backend must not crash, must mark the orphan event as ignored, and must mark the invoice as paid after a backfill replay.
+
+failure_modes:
+  - out-of-order delivery
+  - graceful handling of unknown invoice
+  - replay/backfill recovery
+
+target:
+  webhook_path: /webhooks/solana
+
+events:
+  - name: orphan_payment_event
+    delay_ms: 0
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_020
+      tx_signature: tx_ghi
+      slot: 124000
+      event_type: payment_received
+      invoice_id: inv_003
+      wallet_address: fake_solana_wallet
+      amount: 7.5
+      token_mint: USDC
+      timestamp: "2026-01-01T10:10:00Z"
+
+  - name: create_invoice_after_event
+    delay_ms: 200
+    method: POST
+    path: /invoices
+    body:
+      invoice_id: inv_003
+      wallet_address: fake_solana_wallet
+      expected_amount: 7.5
+      token_mint: USDC
+
+  - name: replay_payment_event
+    delay_ms: 200
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_020_replay
+      tx_signature: tx_ghi_replay
+      slot: 124000
+      event_type: payment_received
+      invoice_id: inv_003
+      wallet_address: fake_solana_wallet
+      amount: 7.5
+      token_mint: USDC
+      timestamp: "2026-01-01T10:10:00Z"
+
+checks:
+  requests:
+    - name: invoice_should_eventually_be_paid
+      method: GET
+      path: /invoices/inv_003
+      expect:
+        json_path: $.status
+        equals: paid
+
+    - name: should_record_at_least_one_ignored_event
+      method: GET
+      path: /events/summary
+      expect:
+        json_path: $.ignored_events
+        gte: 1

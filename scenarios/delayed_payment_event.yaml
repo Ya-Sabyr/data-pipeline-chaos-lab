@@ -1,0 +1,45 @@
+name: delayed_payment_event
+description: Simulates a webhook that arrives 2 seconds after the invoice was created. The backend must still mark the invoice as paid.
+
+failure_modes:
+  - delayed event delivery
+  - eventual consistency
+
+target:
+  webhook_path: /webhooks/solana
+
+setup:
+  requests:
+    - name: create_invoice
+      method: POST
+      path: /invoices
+      body:
+        invoice_id: inv_002
+        wallet_address: fake_solana_wallet
+        expected_amount: 5.0
+        token_mint: USDC
+
+events:
+  - name: late_payment_event
+    delay_ms: 2000
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_010
+      tx_signature: tx_def
+      slot: 123500
+      event_type: payment_received
+      invoice_id: inv_002
+      wallet_address: fake_solana_wallet
+      amount: 5.0
+      token_mint: USDC
+      timestamp: "2026-01-01T10:05:00Z"
+
+checks:
+  requests:
+    - name: invoice_should_be_paid_after_delay
+      method: GET
+      path: /invoices/inv_002
+      expect:
+        json_path: $.status
+        equals: paid

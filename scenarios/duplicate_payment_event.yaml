@@ -1,0 +1,68 @@
+name: duplicate_payment_event
+description: Sends the same Solana payment event twice. The backend must process it only once and detect the second copy as a duplicate.
+
+failure_modes:
+  - duplicate event delivery
+  - idempotency by tx_signature
+  - no double-counting
+
+target:
+  webhook_path: /webhooks/solana
+
+setup:
+  requests:
+    - name: create_invoice
+      method: POST
+      path: /invoices
+      body:
+        invoice_id: inv_001
+        wallet_address: fake_solana_wallet
+        expected_amount: 10.0
+        token_mint: USDC
+
+events:
+  - name: first_payment_event
+    delay_ms: 0
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_001
+      tx_signature: tx_abc
+      slot: 123456
+      event_type: payment_received
+      invoice_id: inv_001
+      wallet_address: fake_solana_wallet
+      amount: 10.0
+      token_mint: USDC
+      timestamp: "2026-01-01T10:00:00Z"
+
+  - name: duplicate_payment_event
+    delay_ms: 500
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_002
+      tx_signature: tx_abc
+      slot: 123456
+      event_type: payment_received
+      invoice_id: inv_001
+      wallet_address: fake_solana_wallet
+      amount: 10.0
+      token_mint: USDC
+      timestamp: "2026-01-01T10:00:01Z"
+
+checks:
+  requests:
+    - name: invoice_should_be_paid
+      method: GET
+      path: /invoices/inv_001
+      expect:
+        json_path: $.status
+        equals: paid
+
+    - name: should_have_one_duplicate_event
+      method: GET
+      path: /events/summary
+      expect:
+        json_path: $.duplicate_events
+        equals: 1

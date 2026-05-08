@@ -1,0 +1,68 @@
+name: replay_backfill_event
+description: Replays a historical payment event after the original was already processed. The backend must detect the replay as a duplicate and must not double-pay the invoice.
+
+failure_modes:
+  - backfill replay
+  - idempotency under replay
+  - no double-payment
+
+target:
+  webhook_path: /webhooks/solana
+
+setup:
+  requests:
+    - name: create_invoice
+      method: POST
+      path: /invoices
+      body:
+        invoice_id: inv_004
+        wallet_address: fake_solana_wallet
+        expected_amount: 12.5
+        token_mint: USDC
+
+events:
+  - name: original_payment_event
+    delay_ms: 0
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_030
+      tx_signature: tx_jkl
+      slot: 124500
+      event_type: payment_received
+      invoice_id: inv_004
+      wallet_address: fake_solana_wallet
+      amount: 12.5
+      token_mint: USDC
+      timestamp: "2026-01-01T10:20:00Z"
+
+  - name: backfill_replay_event
+    delay_ms: 500
+    method: POST
+    path: /webhooks/solana
+    body:
+      event_id: evt_030_replay
+      tx_signature: tx_jkl
+      slot: 124500
+      event_type: payment_received
+      invoice_id: inv_004
+      wallet_address: fake_solana_wallet
+      amount: 12.5
+      token_mint: USDC
+      timestamp: "2026-01-01T10:20:00Z"
+
+checks:
+  requests:
+    - name: invoice_should_be_paid_once
+      method: GET
+      path: /invoices/inv_004
+      expect:
+        json_path: $.status
+        equals: paid
+
+    - name: replay_should_be_detected_as_duplicate
+      method: GET
+      path: /events/summary
+      expect:
+        json_path: $.duplicate_events
+        gte: 1

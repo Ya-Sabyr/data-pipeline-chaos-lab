@@ -1,0 +1,23 @@
+{
+  "name": "chaoslab-example-node-express-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference Node.js + Express backend that demonstrates the HTTP contract chaoslab tests.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

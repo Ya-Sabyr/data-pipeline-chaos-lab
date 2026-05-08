@@ -1,0 +1,50 @@
+{
+  "name": "solana-chaoslab",
+  "version": "0.1.0",
+  "description": "Language-agnostic chaos and reliability testing CLI for Solana event-driven backends.",
+  "type": "module",
+  "bin": {
+    "chaoslab": "./dist/cli.js"
+  },
+  "main": "dist/cli.js",
+  "files": [
+    "dist",
+    "scenarios",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . || true",
+    "demo:node": "node scripts/demo-node.mjs",
+    "demo:python": "node scripts/demo-python.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "solana",
+    "chaos-engineering",
+    "reliability",
+    "webhooks",
+    "indexer",
+    "testing"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "jsonpath-plus": "^10.2.0",
+    "yaml": "^2.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

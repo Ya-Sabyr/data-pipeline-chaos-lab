@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.vitest
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+examples/node-express-backend/node_modules
+examples/node-express-backend/dist
+examples/python-fastapi-backend/__pycache__
+examples/python-fastapi-backend/.venv

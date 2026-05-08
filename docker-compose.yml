@@ -1,0 +1,42 @@
+services:
+  node-backend:
+    build: ./examples/node-express-backend
+    container_name: chaoslab-node-backend
+    environment:
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  python-backend:
+    build: ./examples/python-fastapi-backend
+    container_name: chaoslab-python-backend
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3001/health').status==200 else 1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  chaoslab:
+    build: .
+    container_name: chaoslab
+    volumes:
+      - ./scenarios:/app/scenarios:ro
+    depends_on:
+      node-backend:
+        condition: service_healthy
+      python-backend:
+        condition: service_healthy
+    command:
+      - run
+      - /app/scenarios/duplicate_payment_event.yaml
+      - --target
+      - http://node-backend:3000
+      - --mode
+      - full
