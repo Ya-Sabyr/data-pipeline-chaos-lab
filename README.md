@@ -2,7 +2,19 @@
 
 > Open-source, language-agnostic CLI for chaos and reliability testing of Solana event-driven backends — webhooks, indexer consumers, RPC subscribers.
 
-[![status](https://img.shields.io/badge/status-V0-blue)]() [![license](https://img.shields.io/badge/license-MIT-green)]()
+[![CI](https://github.com/Ya-Sabyr/data-pipeline-chaos-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Ya-Sabyr/data-pipeline-chaos-lab/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/solana-chaoslab.svg)](https://www.npmjs.com/package/solana-chaoslab)
+[![node](https://img.shields.io/node/v/solana-chaoslab.svg)](https://www.npmjs.com/package/solana-chaoslab)
+[![license](https://img.shields.io/npm/l/solana-chaoslab.svg)](./LICENSE)
+
+```bash
+# Try it without installing anything
+npx solana-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
+
+# Or install once, use everywhere
+npm install -g solana-chaoslab
+chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
+```
 
 ---
 
@@ -14,7 +26,7 @@
 4. [Why idempotency by `tx_signature` matters](#4-why-idempotency-by-tx_signature-matters)
 5. [Language-agnostic by design](#5-language-agnostic-by-design)
 6. [No TypeScript knowledge required](#6-no-typescript-knowledge-required)
-7. [Quickstart with Node.js](#7-quickstart-with-nodejs)
+7. [Install](#7-install)
 8. [Quickstart with Docker](#8-quickstart-with-docker)
 9. [Test a Node.js backend](#9-test-a-nodejs-backend)
 10. [Test a Python FastAPI backend](#10-test-a-python-fastapi-backend)
@@ -84,32 +96,80 @@ The CLI is implemented in TypeScript on Node.js 20+. **That choice is internal.*
 
 If you would rather not have Node on your machine at all, [skip to the Docker quickstart](#8-quickstart-with-docker).
 
-## 7. Quickstart with Node.js
+## 7. Install
+
+You do not need to clone this repository to use `chaoslab`. Pick whichever workflow fits.
+
+### One-shot via `npx` (no install)
 
 Requires Node.js 20+.
 
 ```bash
-git clone https://github.com/<your-org>/solana-data-pipeline-chaos-lab.git
-cd solana-data-pipeline-chaos-lab
-npm install
-
-# Generic mode: just send the events. Useful for any backend.
-npm run dev -- run scenarios/duplicate_payment_event.yaml \
-  --target http://localhost:3000 --mode generic
-
-# Full mode: setup + events + state checks. Requires invoice/event endpoints.
-npm run dev -- run scenarios/duplicate_payment_event.yaml \
-  --target http://localhost:3000 --mode full
-
-# CI-friendly JSON output
-npm run dev -- run scenarios/duplicate_payment_event.yaml \
-  --target http://localhost:3000 --mode full --json
-
-# Validate a scenario file without running it
-npm run dev -- validate scenarios/duplicate_payment_event.yaml
+npx solana-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
 ```
 
-Exit codes: `0` PASS, `1` FAIL, `2` configuration error.
+`npx` downloads, runs, and discards. Best for trying it out or for CI jobs that already have Node.
+
+### Global install
+
+```bash
+npm install -g solana-chaoslab
+chaoslab --help
+chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
+```
+
+The binary is named **both** `chaoslab` (short) and `solana-chaoslab` (unambiguous when other CLIs collide).
+
+### Per-project dev dependency
+
+```bash
+npm install --save-dev solana-chaoslab
+npx solana-chaoslab run scenarios/duplicate_payment_event.yaml \
+  --target http://localhost:3000 --mode full
+```
+
+Wire it into your project's npm scripts so `npm test` (or a dedicated `npm run chaos`) replays the scenarios you care about.
+
+### Need example scenarios but don't want to clone?
+
+```bash
+# Grab one bundled scenario directly from the repo
+curl -O https://raw.githubusercontent.com/Ya-Sabyr/data-pipeline-chaos-lab/main/scenarios/duplicate_payment_event.yaml
+
+npx solana-chaoslab run duplicate_payment_event.yaml \
+  --target http://localhost:3000 --mode full
+```
+
+### CLI reference
+
+```bash
+chaoslab run <scenario.yaml> --target <url> [options]
+  --target <url>            base URL of the target backend (required)
+  --mode generic|full       generic = send events only, full = setup + events + checks (default: generic)
+  --json                    emit JSON report instead of human text
+  --timeout-ms <ms>         per-request timeout in milliseconds (default: 10000)
+  --verbose                 verbose logging
+
+chaoslab validate <scenario.yaml>
+  Parses and schema-checks the YAML; non-zero exit on invalid input.
+
+chaoslab --version
+chaoslab --help
+```
+
+Exit codes: `0` PASS, `1` FAIL, `2` configuration error (bad CLI args or YAML).
+
+### Develop on the CLI itself
+
+Only needed if you want to hack on the chaoslab source.
+
+```bash
+git clone https://github.com/Ya-Sabyr/data-pipeline-chaos-lab.git
+cd data-pipeline-chaos-lab
+npm install
+npm test
+npm run dev -- run scenarios/duplicate_payment_event.yaml --target http://localhost:3000 --mode generic
+```
 
 ## 8. Quickstart with Docker
 
@@ -135,11 +195,11 @@ docker compose run --rm chaoslab \
   --target http://python-backend:3001 --mode full
 ```
 
-For a published image (once available) without compose:
+For a published image (publishing GHCR images is on the roadmap) without compose:
 
 ```bash
 docker run --rm -v "$(pwd)/scenarios:/app/scenarios:ro" \
-  ghcr.io/<your-org>/chaoslab \
+  ghcr.io/ya-sabyr/data-pipeline-chaos-lab/chaoslab \
   run /app/scenarios/duplicate_payment_event.yaml \
   --target http://host.docker.internal:3000 --mode full
 ```
@@ -268,9 +328,10 @@ Planned next:
 - Severity-weighted reliability score.
 - HTML / Markdown report formatters for PR comments.
 - Watch / streaming mode for staging-environment fuzzing.
-- npm publish as `solana-chaoslab` (so `npx solana-chaoslab` works without a checkout).
-- CI templates: GitHub Actions, GitLab CI.
+- Publish container images to GHCR so `docker run ghcr.io/ya-sabyr/...` works without a checkout.
+- CI templates users can drop into their own repos: GitHub Actions, GitLab CI, CircleCI.
 - VS Code extension for scenario authoring.
+- A `chaoslab init` subcommand that scaffolds example scenarios into the user's working directory.
 
 See [docs/proposal.md](docs/proposal.md) for the full grant-track plan.
 

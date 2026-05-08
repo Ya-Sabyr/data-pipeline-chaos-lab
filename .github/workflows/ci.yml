@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Validate every shipped scenario
+        run: |
+          for f in scenarios/*.yaml; do
+            node dist/cli.js validate "$f"
+          done
+
+      - name: Smoke-test packed tarball
+        if: matrix.node == '20'
+        run: |
+          npm pack --silent
+          TARBALL=$(ls solana-chaoslab-*.tgz | head -1)
+          echo "Packed: $TARBALL"
+          mkdir -p /tmp/chaoslab-pack-test && cd /tmp/chaoslab-pack-test
+          npm init -y >/dev/null
+          npm install "$GITHUB_WORKSPACE/$TARBALL" --no-audit --no-fund
+          npx --no-install solana-chaoslab --version
+          npx --no-install solana-chaoslab validate "$GITHUB_WORKSPACE/scenarios/duplicate_payment_event.yaml"

@@ -4,13 +4,15 @@
   "description": "Language-agnostic chaos and reliability testing CLI for Solana event-driven backends.",
   "type": "module",
   "bin": {
-    "chaoslab": "./dist/cli.js"
+    "chaoslab": "./dist/cli.js",
+    "solana-chaoslab": "./dist/cli.js"
   },
   "main": "dist/cli.js",
   "files": [
     "dist",
     "scenarios",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
@@ -18,9 +20,11 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . || true",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "demo:node": "node scripts/demo-node.mjs",
-    "demo:python": "node scripts/demo-python.mjs"
+    "demo:python": "node scripts/demo-python.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">=20"
@@ -31,9 +35,24 @@
     "reliability",
     "webhooks",
     "indexer",
-    "testing"
+    "testing",
+    "cli",
+    "yaml"
   ],
+  "author": "Ya-Sabyr",
   "license": "MIT",
+  "homepage": "https://github.com/Ya-Sabyr/data-pipeline-chaos-lab#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ya-Sabyr/data-pipeline-chaos-lab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Ya-Sabyr/data-pipeline-chaos-lab/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
