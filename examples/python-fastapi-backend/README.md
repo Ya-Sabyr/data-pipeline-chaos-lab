@@ -40,6 +40,12 @@ Or run all four scenarios in one shot:
 npm run demo:python
 ```
 
+If port 3001 is already in use, run the demo from the repo root with another port:
+
+```bash
+CHAOSLAB_DEMO_PORT=3101 npm run demo:python
+```
+
 ## Why a Python mirror exists
 
 To prove the language-agnostic claim. Cloning this file in Go, Rust, Java, or any other stack should produce a backend that passes the same scenarios with the same reports.

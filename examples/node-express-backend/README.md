@@ -34,6 +34,12 @@ Or run all four scenarios in one shot:
 npm run demo:node
 ```
 
+If port 3000 is already in use, run the demo from the repo root with another port:
+
+```bash
+CHAOSLAB_DEMO_PORT=3100 npm run demo:node
+```
+
 ## What it demonstrates
 
 - **Idempotency by `tx_signature`**: a second event with the same signature is recorded as a duplicate.

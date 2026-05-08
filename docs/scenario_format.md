@@ -54,7 +54,7 @@ Setup requests run sequentially. If any returns a non-2xx status, the entire run
 ```yaml
 events:
   - name: first_payment_event        # required, used in reports
-    delay_ms: 0                      # required, milliseconds to sleep BEFORE this event
+    delay_ms: 0                      # optional, default 0; sleep BEFORE this event
     method: POST                     # optional, default POST
     path: /webhooks/solana           # optional, default target.webhook_path
     body:                            # required (may be {} if your backend accepts empty bodies)
@@ -70,7 +70,7 @@ events:
       x-source: chaoslab-test
 ```
 
-`events` is an ordered, ordered-on-the-wire list. The runner sleeps `delay_ms` before each event, then issues the request and waits for the response before moving on.
+`events` is an ordered, on-the-wire list. The runner sleeps `delay_ms` before each event, then issues the request and waits for the response before moving on.
 
 Even though the field is called `events`, an entry can issue any HTTP request. This is how out-of-order scenarios interleave invoice creation with webhook delivery.
 
@@ -82,8 +82,8 @@ checks:
     - name: invoice_should_be_paid   # required
       method: GET                    # GET | POST | PUT | PATCH | DELETE
       path: /invoices/inv_001        # path on the target backend
-      body: ~                        # optional
-      headers: ~                     # optional
+      # body: ...                    # optional, serialized as JSON
+      # headers: ...                 # optional string-valued headers
       expect:
         json_path: $.status          # JSONPath against the response body
         equals: paid                 # one of the comparators below
@@ -93,7 +93,7 @@ A check passes when the request returned 2xx **and** the JSONPath comparator pas
 
 ## Comparator catalog
 
-Exactly one comparator must be set per `expect` block:
+The schema requires at least one comparator per `expect` block. Keep scenarios to one comparator per check so reports stay unambiguous:
 
 | Comparator   | Type            | Passes when ...                                                          |
 | ------------ | --------------- | ------------------------------------------------------------------------ |
@@ -101,8 +101,8 @@ Exactly one comparator must be set per `expect` block:
 | `not_equals` | any             | the JSONPath value does NOT deep-equal the given value.                  |
 | `contains`   | string or array | the value (string) contains the substring, or (array) contains the item. |
 | `exists`     | boolean         | the JSONPath has at least one match (`true`) or zero matches (`false`).  |
-| `gte`        | number          | the JSONPath value is a number `>= ` the given value.                    |
-| `lte`        | number          | the JSONPath value is a number `<= ` the given value.                    |
+| `gte`        | number          | the JSONPath value is a number `>=` the given value.                     |
+| `lte`        | number          | the JSONPath value is a number `<=` the given value.                     |
 
 The runner uses `jsonpath-plus` syntax. Common patterns:
 
@@ -121,7 +121,7 @@ Run
 npm run dev -- validate scenarios/your_scenario.yaml
 ```
 
-The validator reports the YAML path and rule for any failure (missing required field, unknown comparator, empty events list).
+The validator reports the YAML path and rule for any failure, such as a missing required field, an `expect` block without a supported comparator, or an empty events list.
 
 ## Versioning
 

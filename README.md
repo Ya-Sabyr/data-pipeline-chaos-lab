@@ -46,7 +46,7 @@ npx solana-chaoslab run duplicate_payment_event.yaml \
   --target http://localhost:3000 --mode full
 ```
 
-Sample output:
+Sample output excerpt:
 
 ```
 Solana Data Pipeline Chaos Lab Report
@@ -104,27 +104,30 @@ More scenarios on the [roadmap](#roadmap).
 
 The CLI is implemented in TypeScript on Node.js — **you never read or write TypeScript**. You author YAML, run a binary, read a report.
 
-## Required HTTP contract
+## HTTP contract
 
-The CLI assumes one required endpoint on your backend:
+The CLI has no hardcoded business API. It sends the requests described by your scenario:
+
+- event requests go to each event's `path`, or to `target.webhook_path` when `path` is omitted;
+- setup and check requests go to the exact `path` values in the YAML.
+
+Most examples use this webhook endpoint:
 
 | Method | Path                | Purpose                          |
 | ------ | ------------------- | -------------------------------- |
 | POST   | `/webhooks/solana`  | Receives event payloads.         |
 
-(You can change the path via `target.webhook_path` in any scenario.)
+(You can change the default path via `target.webhook_path` in any scenario.)
 
-For `--mode full`, the CLI additionally calls these optional endpoints:
+The shipped `--mode full` scenarios also use these reference-backend paths:
 
 | Method | Path                       |
 | ------ | -------------------------- |
 | POST   | `/invoices`                |
 | GET    | `/invoices/{invoice_id}`   |
-| GET    | `/events`                  |
 | GET    | `/events/summary`          |
-| GET    | `/health`                  |
 
-Implement any subset that matches your test goals.
+Implement whatever endpoints your own scenario files reference. The example demos and Docker stack use `GET /health` only as a readiness check before running the CLI.
 
 ## CLI reference
 
@@ -134,7 +137,7 @@ chaoslab run <scenario.yaml> [options]
   --mode generic|full       generic = events only, full = setup + events + checks (default: generic)
   --json                    emit JSON report instead of human text
   --timeout-ms <ms>         per-request timeout in milliseconds (default: 10000)
-  --verbose                 verbose output
+  --verbose                 accepted for future verbose logging
 
 chaoslab validate <scenario.yaml>
   Schema-checks the YAML; non-zero exit on invalid input.
@@ -169,6 +172,8 @@ npm install
 npm run demo:node      # all 4 scenarios PASS against Node backend
 npm run demo:python    # all 4 scenarios PASS against Python backend (auto-creates venv)
 ```
+
+If the default demo ports are already in use, set `CHAOSLAB_DEMO_PORT`, for example `CHAOSLAB_DEMO_PORT=3101 npm run demo:python`.
 
 ## Documentation
 

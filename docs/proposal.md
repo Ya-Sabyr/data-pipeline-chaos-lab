@@ -54,10 +54,10 @@ Scenarios shipped in V0:
 - Four shipped scenarios covering duplicate, delayed, out-of-order, and replay/backfill failure modes.
 - Reference Node.js + Express backend that passes all four scenarios.
 - Reference Python + FastAPI backend that passes all four scenarios (proves cross-language equivalence).
-- Docker images and `docker-compose.yml` for zero-install execution.
+- Dockerfiles and `docker-compose.yml` for zero-install local execution.
 - `npm run demo:node` and `npm run demo:python` one-command demos.
 - Test suite (vitest) covering scenario parsing, runner behavior, JSONPath comparators, and report formatting.
-- Documentation: README (15 sections, language-neutral), architecture, scenario format reference, example report.
+- Documentation: README, architecture, scenario format reference, and example report.
 
 ## Future milestones
 
@@ -69,7 +69,7 @@ Scenarios shipped in V0:
 6. **More example backends** — Rust (axum), Go (chi), Java (Spring Boot).
 7. **CI templates** — drop-in GitHub Actions / GitLab CI snippets.
 8. **Watch mode** — long-running continuous fuzzing for staging environments.
-9. **npm publish** as `solana-chaoslab` so `npx solana-chaoslab` works without a checkout.
+9. **Release automation** — keep npm publishing, provenance, and GitHub Releases reproducible.
 10. **VS Code extension** — scenario authoring and inline run.
 
 ## Budget assumption
