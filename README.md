@@ -1,301 +1,65 @@
-# Solana Data Pipeline Chaos Lab
+# solana-chaoslab
 
-> Open-source, language-agnostic CLI for chaos and reliability testing of Solana event-driven backends — webhooks, indexer consumers, RPC subscribers.
+> Chaos and reliability testing for Solana event-driven backends.
 
 [![CI](https://github.com/Ya-Sabyr/data-pipeline-chaos-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Ya-Sabyr/data-pipeline-chaos-lab/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/solana-chaoslab.svg)](https://www.npmjs.com/package/solana-chaoslab)
-[![node](https://img.shields.io/node/v/solana-chaoslab.svg)](https://www.npmjs.com/package/solana-chaoslab)
+[![npm](https://img.shields.io/npm/v/solana-chaoslab.svg?logo=npm)](https://www.npmjs.com/package/solana-chaoslab)
+[![node](https://img.shields.io/node/v/solana-chaoslab.svg?logo=node.js)](https://www.npmjs.com/package/solana-chaoslab)
 [![license](https://img.shields.io/npm/l/solana-chaoslab.svg)](./LICENSE)
+[![provenance](https://img.shields.io/badge/npm-provenance-blue?logo=github)](https://docs.npmjs.com/generating-provenance-statements)
 
-```bash
-# Try it without installing anything
-npx solana-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
+`solana-chaoslab` replays realistic event-delivery failures — duplicates, late events, out-of-order, replay/backfill — against any HTTP backend you point it at. Describe scenarios in YAML, run a single command, get a pass/fail report with a reliability score.
 
-# Or install once, use everywhere
-npm install -g solana-chaoslab
-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
-```
-
----
-
-## Table of contents
-
-1. [What is this?](#1-what-is-this)
-2. [Why Solana backends need reliability testing](#2-why-solana-backends-need-reliability-testing)
-3. [The five failure modes this tool exercises](#3-the-five-failure-modes-this-tool-exercises)
-4. [Why idempotency by `tx_signature` matters](#4-why-idempotency-by-tx_signature-matters)
-5. [Language-agnostic by design](#5-language-agnostic-by-design)
-6. [No TypeScript knowledge required](#6-no-typescript-knowledge-required)
-7. [Install](#7-install)
-8. [Quickstart with Docker](#8-quickstart-with-docker)
-9. [Test a Node.js backend](#9-test-a-nodejs-backend)
-10. [Test a Python FastAPI backend](#10-test-a-python-fastapi-backend)
-11. [Test any custom backend](#11-test-any-custom-backend)
-12. [Scenario YAML format](#12-scenario-yaml-format)
-13. [Report examples](#13-report-examples)
-14. [Roadmap](#14-roadmap)
-15. [Grant proof-of-work](#15-grant-proof-of-work)
-
----
-
-## 1. What is this?
-
-Solana Data Pipeline Chaos Lab is a small CLI named `chaoslab` that **replays realistic Solana event-delivery failures** against your backend over plain HTTP. You describe scenarios in YAML, run the CLI, and get a pass/fail report with a reliability score.
-
-It does not care what language your backend is written in. It does not require an SDK. It does not require a Solana RPC connection. It is a **black-box reliability test harness** for any HTTP service that consumes Solana-style events.
-
-## 2. Why Solana backends need reliability testing
-
-Most Solana applications listen for on-chain events through a webhook provider, a custom indexer, or RPC subscriptions. In production, the event stream is not clean:
-
-- **Duplicates.** Providers retry on timeout. Indexers republish on restart.
-- **Late delivery.** A network blip causes a webhook to arrive minutes late.
-- **Out-of-order delivery.** Slot rollbacks and parallel pipelines reorder events.
-- **Missed + replayed events.** Backfills push historical events through your live pipeline.
-- **Partial failures.** Your provider's failover delivers half the batch, then redelivers.
-
-If your backend does not handle these correctly, the visible bugs are bad: **double-counted payments, invoices stuck in `pending`, NFT ownership mis-attributed, leaderboards wrong, analytics off.** And these bugs almost never appear in local development, because local tests use clean single-pass streams.
-
-## 3. The five failure modes this tool exercises
-
-V0 ships scenarios for the four most common Solana webhook bugs:
-
-| Scenario file                            | Failure mode                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| `duplicate_payment_event.yaml`           | Same `tx_signature` delivered twice; backend must dedupe.                 |
-| `delayed_payment_event.yaml`             | Webhook arrives 2 s after the originating tx; invoice must still be paid. |
-| `out_of_order_payment_event.yaml`        | Payment arrives before its invoice; backend must not crash, must reconcile after backfill. |
-| `replay_backfill_event.yaml`             | Historical event replayed after the original; backend must detect replay, must not double-pay. |
-
-A fifth (chain reorg / slot rollback) is on the [roadmap](#14-roadmap).
-
-## 4. Why idempotency by `tx_signature` matters
-
-`tx_signature` is the canonical Solana transaction identifier. It is unique per confirmed transaction and stable across replays. **It is the right key for webhook idempotency.**
-
-A correct backend stores the `tx_signature` of every processed event and rejects any subsequent event carrying a `tx_signature` it has already seen. Backends that key off internal `event_id`, timestamps, or invoice IDs will eventually double-count.
-
-The `duplicate_payment_event` and `replay_backfill_event` scenarios are designed specifically to catch backends that key off the wrong field.
-
-## 5. Language-agnostic by design
-
-The user-facing surface is:
-
-- **CLI** — one binary (or one Docker image)
-- **YAML** — scenario format, hand-editable
-- **HTTP + JSON** — the only protocol it speaks to your backend
-- **JSON or human reports** — for CI consumption or eyeballing
-
-There is no client SDK, no language binding, no schema generator. **Your backend can be written in TypeScript, Python, Go, Rust, Java, Elixir, PHP, or anything else.** chaoslab tests it identically.
-
-This repository ships two reference backends, in **Node.js + Express** and **Python + FastAPI**, that are functionally equivalent. The same scenarios pass against both. That's the language-agnostic claim, demonstrated.
-
-## 6. No TypeScript knowledge required
-
-The CLI is implemented in TypeScript on Node.js 20+. **That choice is internal.** Users do not read or write TypeScript. They author YAML, run a binary, and read a report.
-
-If you would rather not have Node on your machine at all, [skip to the Docker quickstart](#8-quickstart-with-docker).
-
-## 7. Install
-
-You do not need to clone this repository to use `chaoslab`. Pick whichever workflow fits.
-
-### One-shot via `npx` (no install)
-
-Requires Node.js 20+.
+Your backend can be written in **any language**. The CLI only speaks HTTP and JSON. No SDK, no client library, no Solana RPC connection required.
 
 ```bash
 npx solana-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
 ```
 
-`npx` downloads, runs, and discards. Best for trying it out or for CI jobs that already have Node.
-
-### Global install
+## Install
 
 ```bash
+# One-shot, no install
+npx solana-chaoslab --help
+
+# Globally
 npm install -g solana-chaoslab
-chaoslab --help
-chaoslab run my-scenario.yaml --target http://localhost:3000 --mode full
-```
+chaoslab --version
 
-The binary is named **both** `chaoslab` (short) and `solana-chaoslab` (unambiguous when other CLIs collide).
-
-### Per-project dev dependency
-
-```bash
+# Per-project (recommended for CI)
 npm install --save-dev solana-chaoslab
-npx solana-chaoslab run scenarios/duplicate_payment_event.yaml \
-  --target http://localhost:3000 --mode full
 ```
 
-Wire it into your project's npm scripts so `npm test` (or a dedicated `npm run chaos`) replays the scenarios you care about.
+Requires **Node.js 20+**. The published binary is named both `chaoslab` (short) and `solana-chaoslab` (unambiguous).
 
-### Need example scenarios but don't want to clone?
+## Quick start
 
 ```bash
-# Grab one bundled scenario directly from the repo
+# 1. Grab a sample scenario
 curl -O https://raw.githubusercontent.com/Ya-Sabyr/data-pipeline-chaos-lab/main/scenarios/duplicate_payment_event.yaml
 
+# 2. Validate the YAML
+npx solana-chaoslab validate duplicate_payment_event.yaml
+
+# 3. Run it against your backend
 npx solana-chaoslab run duplicate_payment_event.yaml \
   --target http://localhost:3000 --mode full
 ```
 
-### CLI reference
-
-```bash
-chaoslab run <scenario.yaml> --target <url> [options]
-  --target <url>            base URL of the target backend (required)
-  --mode generic|full       generic = send events only, full = setup + events + checks (default: generic)
-  --json                    emit JSON report instead of human text
-  --timeout-ms <ms>         per-request timeout in milliseconds (default: 10000)
-  --verbose                 verbose logging
-
-chaoslab validate <scenario.yaml>
-  Parses and schema-checks the YAML; non-zero exit on invalid input.
-
-chaoslab --version
-chaoslab --help
-```
-
-Exit codes: `0` PASS, `1` FAIL, `2` configuration error (bad CLI args or YAML).
-
-### Develop on the CLI itself
-
-Only needed if you want to hack on the chaoslab source.
-
-```bash
-git clone https://github.com/Ya-Sabyr/data-pipeline-chaos-lab.git
-cd data-pipeline-chaos-lab
-npm install
-npm test
-npm run dev -- run scenarios/duplicate_payment_event.yaml --target http://localhost:3000 --mode generic
-```
-
-## 8. Quickstart with Docker
-
-No Node, no Python, no installs.
-
-```bash
-docker compose up --build chaoslab node-backend
-```
-
-This brings up the reference Node backend on port 3000 and runs the duplicate-payment scenario against it. To run a different scenario:
-
-```bash
-docker compose run --rm chaoslab \
-  run /app/scenarios/replay_backfill_event.yaml \
-  --target http://node-backend:3000 --mode full
-```
-
-To run against the Python reference backend instead:
-
-```bash
-docker compose run --rm chaoslab \
-  run /app/scenarios/replay_backfill_event.yaml \
-  --target http://python-backend:3001 --mode full
-```
-
-For a published image (publishing GHCR images is on the roadmap) without compose:
-
-```bash
-docker run --rm -v "$(pwd)/scenarios:/app/scenarios:ro" \
-  ghcr.io/ya-sabyr/data-pipeline-chaos-lab/chaoslab \
-  run /app/scenarios/duplicate_payment_event.yaml \
-  --target http://host.docker.internal:3000 --mode full
-```
-
-## 9. Test a Node.js backend
-
-The repo includes `examples/node-express-backend/` — a minimal Express + TypeScript backend in ~150 lines that demonstrates the HTTP contract. Run all four scenarios against it with:
-
-```bash
-npm run demo:node
-```
-
-Expected output: every scenario reports `Result: PASS` and `Reliability score: 100%`.
-
-To wire up your own Node backend, just expose the [endpoints listed below](#11-test-any-custom-backend) and point chaoslab at its base URL.
-
-## 10. Test a Python FastAPI backend
-
-The repo includes `examples/python-fastapi-backend/` — a Python + FastAPI mirror of the Node backend.
-
-```bash
-npm run demo:python
-```
-
-(The script auto-creates a `.venv` and installs deps on first run.) Expected output: identical PASS results to the Node demo, proving the language-agnostic claim.
-
-## 11. Test any custom backend
-
-The CLI assumes only one required endpoint:
-
-| Method | Path                | Purpose                                        |
-| ------ | ------------------- | ---------------------------------------------- |
-| POST   | `/webhooks/solana`  | Receives Solana event payloads.                |
-
-(You can change the path via `target.webhook_path` in any scenario.)
-
-For `--mode full`, the CLI additionally hits these optional endpoints:
-
-| Method | Path                       | Purpose                                                  |
-| ------ | -------------------------- | -------------------------------------------------------- |
-| POST   | `/invoices`                | Setup: create an invoice in `pending` status.            |
-| GET    | `/invoices/{invoice_id}`   | Check: read invoice status (`paid` / `pending`).         |
-| GET    | `/events/summary`          | Check: aggregate counts (`processed_events`, `duplicate_events`, `ignored_events`, `total_events`). |
-| GET    | `/events`                  | Optional: full event list.                               |
-| GET    | `/health`                  | Optional: liveness check.                                |
-
-Implement those endpoints in your stack of choice, point `--target` at your base URL, and you are done. **No code from this repo runs inside your backend.**
-
-## 12. Scenario YAML format
-
-See [docs/scenario_format.md](docs/scenario_format.md) for the full reference.
-
-Minimal example:
-
-```yaml
-name: duplicate_payment_event
-target:
-  webhook_path: /webhooks/solana
-events:
-  - name: first
-    delay_ms: 0
-    body:
-      tx_signature: tx_abc
-      invoice_id: inv_001
-      amount: 10.0
-  - name: duplicate
-    delay_ms: 500
-    body:
-      tx_signature: tx_abc
-      invoice_id: inv_001
-      amount: 10.0
-checks:
-  requests:
-    - name: invoice_paid
-      method: GET
-      path: /invoices/inv_001
-      expect:
-        json_path: $.status
-        equals: paid
-```
-
-Comparators: `equals`, `not_equals`, `contains`, `exists`, `gte`, `lte`. JSONPath syntax is `jsonpath-plus`.
-
-## 13. Report examples
-
-See [docs/example_report.md](docs/example_report.md) for full samples in both formats.
-
-Human (default):
+Sample output:
 
 ```
-Result: PASS
+Solana Data Pipeline Chaos Lab Report
+
+Scenario: duplicate_payment_event
+Target:   http://localhost:3000
+Mode:     full
+Result:   PASS
 Reliability score: 100%
 
 Checks:
-  - invoice_should_be_paid: PASS ($.status equals "paid"; got "paid")
-  - should_have_one_duplicate_event: PASS ($.duplicate_events equals 1; got 1)
+  - invoice_should_be_paid: PASS  ($.status equals "paid"; got "paid")
+  - should_have_one_duplicate_event: PASS  ($.duplicate_events equals 1; got 1)
 
 Failure modes tested:
   - duplicate event delivery
@@ -303,68 +67,150 @@ Failure modes tested:
   - no double-counting
 ```
 
-JSON (`--json`):
+## Features
 
-```json
-{
-  "report_version": "1",
-  "result": "PASS",
-  "reliability_score": 100,
-  "failure_modes_tested": ["duplicate event delivery", "idempotency by tx_signature"],
-  "checks": [{"name": "invoice_should_be_paid", "passed": true, "expected": "paid", "actual": "paid"}]
-}
+- **Language-agnostic** — TypeScript, Python, Go, Rust, Java, Elixir, anything that speaks HTTP.
+- **YAML scenarios** — hand-editable, diff-friendly, no code required.
+- **Two execution modes** — `--mode generic` just sends events; `--mode full` runs setup, events, and state checks.
+- **JSONPath assertions** — `equals`, `not_equals`, `contains`, `exists`, `gte`, `lte`.
+- **CI-friendly reports** — human text by default, JSON via `--json`. Exit codes: `0` PASS, `1` FAIL, `2` config error.
+- **Docker-ready** — run without installing Node at all.
+- **Provenance-signed** — published to npm with verifiable [build attestations](https://docs.npmjs.com/generating-provenance-statements) from GitHub Actions.
+
+## Failure modes covered
+
+| Scenario                          | What it tests                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `duplicate_payment_event`         | Same `tx_signature` delivered twice — backend must dedupe.                     |
+| `delayed_payment_event`           | Webhook arrives 2 s after the originating tx — invoice must still become paid. |
+| `out_of_order_payment_event`      | Payment arrives before its invoice — backend must reconcile after backfill.    |
+| `replay_backfill_event`           | Historical event replayed after the original — backend must not double-pay.    |
+
+More scenarios on the [roadmap](#roadmap).
+
+## How it works
+
+```
++-----------------+         HTTP + JSON         +----------------------+
+|   chaoslab      |  --- setup requests   --->  |                      |
+|   (Node CLI)    |  --- webhook events   --->  |   YOUR BACKEND       |
+|                 |  --- check requests   --->  |   (any language)     |
+|  YAML scenarios |  <-- responses ---          |                      |
++-----------------+                             +----------------------+
+        |
+        v
+   Report (human or JSON, plus exit code)
 ```
 
-## 14. Roadmap
+The CLI is implemented in TypeScript on Node.js — **you never read or write TypeScript**. You author YAML, run a binary, read a report.
 
-V0 (this milestone): walking skeleton, four scenarios, generic + full modes, JSON + human reports, two reference backends, Docker demo, full docs.
+## Required HTTP contract
 
-Planned next:
+The CLI assumes one required endpoint on your backend:
+
+| Method | Path                | Purpose                          |
+| ------ | ------------------- | -------------------------------- |
+| POST   | `/webhooks/solana`  | Receives event payloads.         |
+
+(You can change the path via `target.webhook_path` in any scenario.)
+
+For `--mode full`, the CLI additionally calls these optional endpoints:
+
+| Method | Path                       |
+| ------ | -------------------------- |
+| POST   | `/invoices`                |
+| GET    | `/invoices/{invoice_id}`   |
+| GET    | `/events`                  |
+| GET    | `/events/summary`          |
+| GET    | `/health`                  |
+
+Implement any subset that matches your test goals.
+
+## CLI reference
+
+```
+chaoslab run <scenario.yaml> [options]
+  --target <url>            base URL of the target backend (required)
+  --mode generic|full       generic = events only, full = setup + events + checks (default: generic)
+  --json                    emit JSON report instead of human text
+  --timeout-ms <ms>         per-request timeout in milliseconds (default: 10000)
+  --verbose                 verbose output
+
+chaoslab validate <scenario.yaml>
+  Schema-checks the YAML; non-zero exit on invalid input.
+
+chaoslab --version
+chaoslab --help
+```
+
+## Run with Docker
+
+No Node, no Python, no installs:
+
+```bash
+git clone https://github.com/Ya-Sabyr/data-pipeline-chaos-lab.git
+cd data-pipeline-chaos-lab
+docker compose up --build chaoslab node-backend
+```
+
+This brings up the reference Node backend on port 3000 and runs the duplicate-payment scenario against it. Swap `node-backend` for `python-backend` to verify the language-agnostic claim end-to-end.
+
+## Examples
+
+The repo ships two reference backends that demonstrate the HTTP contract — both pass all four shipped scenarios:
+
+- [`examples/node-express-backend`](examples/node-express-backend) — Node.js + Express, ~150 lines.
+- [`examples/python-fastapi-backend`](examples/python-fastapi-backend) — Python + FastAPI, same API.
+
+Try them after cloning:
+
+```bash
+npm install
+npm run demo:node      # all 4 scenarios PASS against Node backend
+npm run demo:python    # all 4 scenarios PASS against Python backend (auto-creates venv)
+```
+
+## Documentation
+
+- [Scenario YAML format](docs/scenario_format.md) — full field reference and comparator catalog.
+- [Architecture](docs/architecture.md) — runner phases, score computation, design notes.
+- [Example reports](docs/example_report.md) — human and JSON output side by side.
+- [Project proposal](docs/proposal.md) — motivation, public-good positioning, milestones.
+
+## Roadmap
 
 - Real Solana RPC integration (replay actual mainnet/devnet transactions).
 - Chain reorg / slot rollback scenario.
-- More example backends: Rust (axum), Go (chi), Java (Spring Boot).
+- More reference backends: Rust (axum), Go (chi), Java (Spring Boot).
 - Network chaos primitives (jitter distributions, retry storms, packet loss).
-- Severity-weighted reliability score.
+- Severity-weighted reliability score with critical/warning tiers.
 - HTML / Markdown report formatters for PR comments.
-- Watch / streaming mode for staging-environment fuzzing.
-- Publish container images to GHCR so `docker run ghcr.io/ya-sabyr/...` works without a checkout.
-- CI templates users can drop into their own repos: GitHub Actions, GitLab CI, CircleCI.
-- VS Code extension for scenario authoring.
-- A `chaoslab init` subcommand that scaffolds example scenarios into the user's working directory.
+- `chaoslab init` to scaffold example scenarios.
+- Watch / streaming mode for staging fuzzing.
+- GitHub Actions and GitLab CI templates.
+- VS Code extension.
 
-See [docs/proposal.md](docs/proposal.md) for the full grant-track plan.
+See [docs/proposal.md](docs/proposal.md) for the full plan.
 
-## 15. Grant proof-of-work
+## Contributing
 
-This repository is the V0 deliverable for a Solana ecosystem grant focused on **public-good reliability infrastructure**. It is positioned for the Solana ecosystem, not for one specific runtime.
-
-Grant reviewers can verify the V0 in under five minutes:
+Bug reports, scenario contributions, and example backends in new languages are all welcome.
 
 ```bash
-git clone <repo>
-cd solana-data-pipeline-chaos-lab
+git clone https://github.com/Ya-Sabyr/data-pipeline-chaos-lab.git
+cd data-pipeline-chaos-lab
 npm install
-npm test                 # unit tests pass
-npm run demo:node        # all 4 scenarios PASS against Node backend
-npm run demo:python      # all 4 scenarios PASS against Python backend
-docker compose up --build chaoslab node-backend  # PASS in container
-```
-
-For full positioning, motivation, deliverables, and budget: [docs/proposal.md](docs/proposal.md).
-
----
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md).
-
-## Tests
-
-```bash
 npm test
 ```
 
+New scenarios are just YAML — they don't require touching TypeScript at all. Drop one in `scenarios/`, add a test that loads it, open a PR.
+
+For maintainers cutting releases, see [RELEASING.md](RELEASING.md).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-MIT.
+[MIT](LICENSE) © Ya-Sabyr
